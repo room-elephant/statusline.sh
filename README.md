@@ -1,6 +1,6 @@
 # statusline.sh
 
-A statusline for [Claude Code](https://claude.com/claude-code) in a single dependency-free bash script. No npm, no config TUI — copy one file, get all of this (every segment [can be toggled off](#configuration)):
+A blazing-fast statusline for [Claude Code](https://claude.com/claude-code), packed into a single bash script. No npm, no Python, no weird dependencies — drop in one file and get all of this (don't want a segment? [flip it off](#configuration)):
 
 ![statusline.sh demo](statusline.webp)
 
