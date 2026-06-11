@@ -5,8 +5,8 @@ A statusline for [Claude Code](https://claude.com/claude-code) in a single depen
 ![statusline.sh demo](statusline.webp)
 
 ```
-~/w/payments-api ⎇ PAYM-1234 ●2✚1?3 · ☕ 21  │  ◆ Opus 4.8  high · ███░░░░░ 38% · ⚙ running  │  $1.234 · ↑ $0.0512/min  │  ◑ 42% · ↻ 16:13  │  🔌 github · Gmail
-└───────────────────┬────────────────────────┘  └──────────────────────┬─────────────────────┘   └──────────┬───────────┘ └─────────┬───────┘  └─────────┬────────┘
+ ~/w/payments-api ⎇ PAYM-1234 ●2✚1?3 · ☕ 21  │  ◆ Opus 4.8  high · ███░░░░░ 38% · ⚙ running  │  $1.234 · ↑ $0.0512/min  │  ◑ 42% · ↻ 16:13  │  🔌 github · Gmail
+└───────────────────┬───────────────────────┘  └──────────────────────┬─────────────────────┘  └──────────┬────────────┘  └────────┬───────┘  └─────────┬────────┘
           path · git · tech stack                   model · effort · context bar · activity          cost · burn rate        5h rate limit          MCP servers
 ```
 
