@@ -73,19 +73,19 @@ Every segment is a `0`/`1` flag, defaulting to on. Set them in `~/.claude/status
 ```bash
 # ~/.claude/statusline.conf
 SHOW_BURN=0
-SHOW_TICKET=0
+SHOW_ONLY_TICKET=0
 ```
 
-| Flag            | Controls                                                 |
-|-----------------|----------------------------------------------------------|
-| `SHOW_DIRTY`    | git dirty counts (staged `●` unstaged `✚` untracked `?`) |
-| `SHOW_TICKET`   | collapse branch names to their JIRA-style ticket         |
-| `SHOW_TECH`     | language/version icon (☕ ⬡ 🦀 🐍 go)                     |
-| `SHOW_ACTIVITY` | waiting / running / thinking indicator                   |
-| `SHOW_COST`     | total session cost                                       |
-| `SHOW_BURN`     | $/min burn rate                                          |
-| `SHOW_LIMITS`   | 5h rate-limit gauge + reset time                         |
-| `SHOW_MCP`      | MCP servers used this session                            |
+| Flag               | Controls                                                 |
+|--------------------|----------------------------------------------------------|
+| `SHOW_DIRTY`       | git dirty counts (staged `●` unstaged `✚` untracked `?`) |
+| `SHOW_ONLY_TICKET` | show the JIRA ticket ID instead of the full branch name  |
+| `SHOW_TECH`        | language/version icon (☕ ⬡ 🦀 🐍 go)                     |
+| `SHOW_ACTIVITY`    | waiting / running / thinking indicator                   |
+| `SHOW_COST`        | total session cost                                       |
+| `SHOW_BURN`        | $/min burn rate                                          |
+| `SHOW_LIMITS`      | 5h rate-limit gauge + reset time                         |
+| `SHOW_MCP`         | MCP servers used this session                            |
 
 ## How it works
 

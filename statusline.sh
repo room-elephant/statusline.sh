@@ -9,7 +9,7 @@ SHOW_COST="${SHOW_COST:-1}"          # session cost
 SHOW_BURN="${SHOW_BURN:-1}"          # $/min burn rate
 SHOW_MCP="${SHOW_MCP:-1}"            # connected MCP servers
 SHOW_LIMITS="${SHOW_LIMITS:-1}"      # 5h rate-limit gauge
-SHOW_TICKET="${SHOW_TICKET:-1}"      # collapse branch to JIRA-style ticket ID
+SHOW_ONLY_TICKET="${SHOW_ONLY_TICKET:-1}" # show JIRA ticket ID instead of full branch name
 
 [ -f "$HOME/.claude/statusline.conf" ] && source "$HOME/.claude/statusline.conf"
 
@@ -56,7 +56,7 @@ FOLDER=$(echo "${CWD/$HOME/~}" | sed -E 's|([^/])[^/]*/|\1/|g')
 BRANCH=$(git -C "$CWD" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "no-git")
 [ "$BRANCH" = "HEAD" ] && BRANCH=$(git -C "$CWD" rev-parse --short HEAD 2>/dev/null || echo "HEAD")
 TICKET=""
-[ "$SHOW_TICKET" = 1 ] && [[ "$BRANCH" =~ ([A-Z]+-[0-9]+) ]] && TICKET="${BASH_REMATCH[1]}"
+[ "$SHOW_ONLY_TICKET" = 1 ] && [[ "$BRANCH" =~ ([A-Za-z]+-[0-9]+) ]] && TICKET=$(tr '[:lower:]' '[:upper:]' <<<"${BASH_REMATCH[1]}")
 BRANCH_DISPLAY="${TICKET:-$BRANCH}"
 
 DIRTY=""
