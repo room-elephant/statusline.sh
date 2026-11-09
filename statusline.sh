@@ -8,7 +8,9 @@ SHOW_ACTIVITY="${SHOW_ACTIVITY:-1}"  # waiting/running/thinking
 SHOW_COST="${SHOW_COST:-1}"          # session cost
 SHOW_BURN="${SHOW_BURN:-1}"          # $/min burn rate
 SHOW_MCP="${SHOW_MCP:-1}"            # connected MCP servers
-SHOW_LIMITS="${SHOW_LIMITS:-1}"      # 5h rate-limit gauge
+SHOW_LIMITS="${SHOW_LIMITS:-1}"      # 5h rate-limit gauge (or monthly spend limit)
+FETCH_USAGE="${FETCH_USAGE:-1}"      # no limit in payload → fetch /api/oauth/usage (macOS, cached)
+USAGE_TTL="${USAGE_TTL:-300}"        # seconds between usage fetches
 SHOW_ONLY_TICKET="${SHOW_ONLY_TICKET:-1}" # show JIRA ticket ID instead of full branch name
 
 [ -f "$HOME/.claude/statusline.conf" ] && source "$HOME/.claude/statusline.conf"
@@ -32,7 +34,7 @@ SP="${RESET} "
 # ── input ─────────────────────────────────────────────────────────────────────
 # \x1f delimiter: unlike tab, it's not IFS whitespace, so empty fields
 # (e.g. no effort level) don't collapse and shift the ones after them
-IFS=$'\x1f' read -r MODEL EFFORT CWD CTX_PCT COST_NUM SESSION_ID TRANSCRIPT LIMIT_PCT LIMIT_RESET < <(
+IFS=$'\x1f' read -r MODEL EFFORT CWD CTX_PCT COST_NUM SESSION_ID TRANSCRIPT LIMIT_PCT LIMIT_RESET SPEND_PCT SPEND_USED SPEND_MAX < <(
   jq -r '[
     (.model.display_name // "unknown" | gsub(" *\\(.*\\)$"; "")),
     (.effort.level // ""),
@@ -42,10 +44,62 @@ IFS=$'\x1f' read -r MODEL EFFORT CWD CTX_PCT COST_NUM SESSION_ID TRANSCRIPT LIMI
     (.session_id // ""),
     (.transcript_path // ""),
     ((.rate_limits.five_hour.used_percentage // -1) | floor | tostring),
-    ((.rate_limits.five_hour.resets_at // 0) | tostring)
+    ((.rate_limits.five_hour.resets_at // 0) | tostring),
+    ((.rate_limits.spend_limit.used_percentage // -1) | floor | tostring),
+    ((.rate_limits.spend_limit.used_usd // "") | tostring),
+    ((.rate_limits.spend_limit.limit_usd // "") | tostring)
   ] | join("\u001f")' <<< "$input"
 )
 printf -v COST "%.3f" "$COST_NUM"
+
+# ── usage fallback ────────────────────────────────────────────────────────────
+# claude.ai Enterprise (usage-based) seats get no rate_limits in the payload, but
+# /usage's "$X / $Y spent" comes from GET /api/oauth/usage, which answers the
+# Claude Code OAuth token. Only when the payload has no rate limits (5h window or
+# spend limit): refresh it in the background at most every USAGE_TTL seconds and
+# render from the cache, so the statusline never waits on the network. The token
+# is read from the macOS keychain per fetch, passed to curl on stdin (not argv)
+# and never written to disk; only the response is cached.
+USAGE_CACHE="${TMPDIR:-/tmp}/claude-statusline-usage.json"
+refresh_usage() {
+  local lock="$USAGE_CACHE.lock" tmp="$USAGE_CACHE.$$" token
+  mkdir "$lock" 2>/dev/null || {
+    # stale lock from a killed fetch: drop it after 2 min
+    [ -n "$(find "$lock" -maxdepth 0 -mmin +2 2>/dev/null)" ] && rmdir "$lock"
+    return
+  }
+  token=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null \
+    | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null)
+  if [ -n "$token" ]; then
+    printf 'Authorization: Bearer %s\n' "$token" \
+      | curl -sS --max-time 10 -H @- -H "anthropic-beta: oauth-2025-04-20" \
+          https://api.anthropic.com/api/oauth/usage -o "$tmp" 2>/dev/null \
+      && jq -e '.extra_usage.monthly_limit' "$tmp" >/dev/null 2>&1 \
+      && mv -f "$tmp" "$USAGE_CACHE"
+  fi
+  # touch even on failure so a broken fetch is retried after USAGE_TTL, not every render
+  touch "$USAGE_CACHE"
+  rm -f "$tmp"
+  rmdir "$lock"
+}
+if [ "$SHOW_LIMITS" = 1 ] && [ "$FETCH_USAGE" = 1 ] \
+   && [ "$LIMIT_PCT" -lt 0 ] 2>/dev/null && [ "$SPEND_PCT" -lt 0 ] 2>/dev/null; then
+  CACHE_MTIME=$(stat -f %m "$USAGE_CACHE" 2>/dev/null || stat -c %Y "$USAGE_CACHE" 2>/dev/null || echo 0)
+  if [ $(( $(date +%s) - CACHE_MTIME )) -ge "$USAGE_TTL" ]; then
+    ( refresh_usage ) </dev/null >/dev/null 2>&1 &
+    disown 2>/dev/null
+  fi
+  if [ -s "$USAGE_CACHE" ]; then
+    IFS=$'\x1f' read -r SPEND_PCT SPEND_USED SPEND_MAX < <(
+      jq -r '.extra_usage | select(.monthly_limit != null) | [
+        ((.utilization // -1) | floor | tostring),
+        ((.used_credits // 0) / 100 | tostring),
+        ((.monthly_limit // 0) / 100 | tostring)
+      ] | join("\u001f")' "$USAGE_CACHE" 2>/dev/null
+    )
+    : "${SPEND_PCT:=-1}"
+  fi
+fi
 
 # ── SEC_PATH ──────────────────────────────────────────────────────────────────
 
@@ -240,8 +294,17 @@ if [ "$SHOW_MCP" = 1 ] && [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
 fi
 
 # ── SEC_LIMITS ────────────────────────────────────────────────────────────────
-# 5h rate-limit window: only present for Pro/Max after the first API response
+# 5h rate-limit window: only present for Pro/Max after the first API response.
+# Otherwise fall back to rate_limits.spend_limit, which Claude Code sends only
+# behind a Claude gateway that reports a spend limit (e.g. "$86 / $750").
 LIMITS_DISPLAY=""
+LIMIT_PREFIX=""
+if [ "$LIMIT_PCT" -lt 0 ] 2>/dev/null && [ "$SPEND_PCT" -ge 0 ] 2>/dev/null; then
+  LIMIT_PCT="$SPEND_PCT"
+  LIMIT_RESET=0   # no reset date for the spend limit
+  [ -n "$SPEND_USED" ] && [ -n "$SPEND_MAX" ] \
+    && printf -v LIMIT_PREFIX '$%.0f / $%.0f · ' "$SPEND_USED" "$SPEND_MAX"
+fi
 if [ "$SHOW_LIMITS" = 1 ] && [ "$LIMIT_PCT" -ge 0 ] 2>/dev/null; then
   if [ "$LIMIT_PCT" -ge 80 ]; then
     LIMIT_COLOR="$BRIGHT_RED"
@@ -261,7 +324,7 @@ if [ "$SHOW_LIMITS" = 1 ] && [ "$LIMIT_PCT" -ge 0 ] 2>/dev/null; then
   else
     LIMIT_ICON="○"
   fi
-  LIMITS_DISPLAY="${LIMIT_COLOR}${LIMIT_ICON} ${LIMIT_PCT}%"
+  LIMITS_DISPLAY="${RESET}${LIMIT_ICON} ${LIMIT_PREFIX}${LIMIT_COLOR}${LIMIT_PCT}%${RESET}"
   if [ "$LIMIT_RESET" -gt 0 ] 2>/dev/null; then
     RESET_TIME=$(date -r "$LIMIT_RESET" +%H:%M 2>/dev/null \
       || date -d "@$LIMIT_RESET" +%H:%M 2>/dev/null)

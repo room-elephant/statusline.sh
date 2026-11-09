@@ -26,7 +26,7 @@ A blazing-fast statusline for [Claude Code](https://claude.com/claude-code), pac
 **What it's costing you**
 
 - **Burn rate** — how fast you're spending: `$/min` alongside total session cost.
-- **5h rate limit** — usage gauge (`○ ◔ ◑ ◕ ●`) and reset time (Pro/Max plans).
+- **5h rate limit** — usage gauge (`○ ◔ ◑ ◕ ●`) and reset time (Pro/Max plans), or your monthly spend limit when Claude Code reports one instead.
 
 **What's connected**
 
@@ -84,8 +84,24 @@ SHOW_ONLY_TICKET=0
 | `SHOW_ACTIVITY`    | waiting / running / thinking indicator                   |
 | `SHOW_COST`        | total session cost                                       |
 | `SHOW_BURN`        | $/min burn rate                                          |
-| `SHOW_LIMITS`      | 5h rate-limit gauge + reset time                         |
+| `SHOW_LIMITS`      | 5h rate-limit gauge + reset time, or monthly spend limit |
 | `SHOW_MCP`         | MCP servers used this session                            |
+
+Two more settings control the [usage fallback](#usage-fallback-claudeai-enterprise):
+
+| Setting       | Default | Controls                                                          |
+|---------------|---------|-------------------------------------------------------------------|
+| `FETCH_USAGE` | `1`     | fetch your monthly spend from `/api/oauth/usage` when the payload has no rate limits (macOS only) |
+| `USAGE_TTL`   | `300`   | seconds between those fetches                                     |
+
+### Usage fallback (claude.ai Enterprise)
+
+On claude.ai Enterprise usage-based seats, Claude Code sends no rate limits to the statusline, so the limits segment stays hidden. In that case (and only then), the script instead asks the same endpoint `/usage` uses — `GET https://api.anthropic.com/api/oauth/usage` — and shows your monthly spend as `◔ $88 / $750 · 11%`.
+
+- **When it runs:** only if the payload has neither a 5h rate limit nor a spend limit, so Pro/Max plans with quota data never make the request. Set `FETCH_USAGE=0` to turn it off entirely. The fetch happens in the background at most every `USAGE_TTL` seconds, and the statusline renders from a cache in `$TMPDIR`, so it never waits on the network. A failed fetch is retried after `USAGE_TTL`, not on every render.
+- **macOS only:** it reads your Claude Code OAuth token from the login keychain (item `Claude Code-credentials`).
+- **Token handling:** the token is read fresh for each fetch and handed to `curl` on stdin, so it never appears in a process list or on disk. Only the API response is cached.
+- **Unofficial:** the endpoint is undocumented and may change or disappear; if it does, the segment just stays hidden.
 
 ## How it works
 
@@ -94,6 +110,7 @@ Claude Code pipes a JSON payload (model, cwd, cost, context usage, transcript pa
 - **Tech stack** is detected from config files alone (`pom.xml`, `package.json`, `go.mod`, `Cargo.toml`, …) — no runtime is ever launched.
 - **Activity** comes from the last `user`/`assistant` entry in the transcript tail: an assistant message ending in text means Claude is waiting; a `tool_use` block means a tool is running; anything mid-stream means it's thinking.
 - **Burn rate** is a rolling ~5-minute window: a tiny state file in `$TMPDIR` per session holds a window start time and cost, resampled every ~5 minutes.
+- **Usage fallback** is a background `curl` to `/api/oauth/usage`, guarded by a `mkdir` lock and cached in `$TMPDIR` — see [above](#usage-fallback-claudeai-enterprise).
 - **MCP detection** greps the transcript for `mcp__server__tool` invocations, caching a byte offset so each render only scans what's new. Disabled servers from `~/.claude.json` are filtered out.
 
 ## Uninstall
