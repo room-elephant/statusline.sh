@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-RAW_URL="https://raw.githubusercontent.com/JPedroBorges/statusline.sh/main/statusline.sh"
+RAW_URL="https://raw.githubusercontent.com/room-elephant/statusline.sh/main/statusline.sh"
 CLAUDE_DIR="$HOME/.claude"
 TARGET="$CLAUDE_DIR/statusline.sh"
 SETTINGS="$CLAUDE_DIR/settings.json"

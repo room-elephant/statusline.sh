@@ -50,7 +50,7 @@ The installer downloads `statusline.sh` to `~/.claude/statusline.sh` and wires i
 ### Manual install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JPedroBorges/statusline.sh/main/statusline.sh -o ~/.claude/statusline.sh
+curl -fsSL https://raw.githubusercontent.com/room-elephant/statusline.sh/main/statusline.sh -o ~/.claude/statusline.sh
 chmod +x ~/.claude/statusline.sh
 ```
 
