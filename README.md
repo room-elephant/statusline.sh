@@ -42,7 +42,7 @@ If some info isn't available (not in a git repo, session just started, …), tha
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JPedroBorges/statusline.sh/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/room-elephant/statusline.sh/main/install.sh | bash
 ```
 
 The installer downloads `statusline.sh` to `~/.claude/statusline.sh` and wires it into `~/.claude/settings.json` (backing up the original). It won't overwrite an existing statusline config — it tells you what to change instead.
